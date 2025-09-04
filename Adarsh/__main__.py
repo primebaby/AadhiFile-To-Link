@@ -5,6 +5,8 @@ import glob
 import asyncio
 import logging
 import importlib
+import time
+import requests
 from pathlib import Path
 from pyrogram import idle
 from .bot import StreamBot
@@ -22,22 +24,39 @@ logging.getLogger("aiohttp").setLevel(logging.ERROR)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 logging.getLogger("aiohttp.web").setLevel(logging.ERROR)
 
+# ---------------------- Time Sync Fix ----------------------
+def sync_time():
+    try:
+        r = requests.get("http://worldtimeapi.org/api/timezone/Etc/UTC", timeout=10).json()
+        server_time = r["unixtime"]
+        local_time = int(time.time())
+        drift = server_time - local_time
+        if abs(drift) > 5:  # if drift more than 5 seconds
+            os.environ["TZ"] = "UTC"
+            time.tzset()
+            print(f"[Time Sync] Corrected drift: {drift} seconds")
+        else:
+            print("[Time Sync] Local time is in sync")
+    except Exception as e:
+        print("[Time Sync] Failed:", e)
+
+sync_time()
+# -----------------------------------------------------------
+
 ppath = "Adarsh/bot/plugins/*.py"
 files = glob.glob(ppath)
-StreamBot.start()
-loop = asyncio.get_event_loop()
 
+loop = asyncio.get_event_loop()
 
 async def start_services():
     print('\n')
-    print('------------------- Initalizing Telegram Bot -------------------')
+    print('------------------- Initializing Telegram Bot -------------------')
+    await StreamBot.start()   # moved inside async AFTER time sync
     bot_info = await StreamBot.get_me()
     StreamBot.username = bot_info.username
     print("------------------------------ DONE ------------------------------")
     print()
-    print(
-        "---------------------- Initializing Clients ----------------------"
-    )
+    print("---------------------- Initializing Clients ----------------------")
     await initialize_clients()
     print("------------------------------ DONE ------------------------------")
     print('\n')
@@ -57,14 +76,13 @@ async def start_services():
         print("------------------ Starting Keep Alive Service ------------------")
         print()
         asyncio.create_task(ping_server())
-    print('-------------------- Initalizing Web Server -------------------------')
+    print('-------------------- Initializing Web Server -------------------------')
     app = web.AppRunner(await web_server())
     await app.setup()
     bind_address = ".railway.app" if Var.ON_HEROKU else Var.BIND_ADRESS
     await web.TCPSite(app, bind_address, Var.PORT).start()
     print('----------------------------- DONE ---------------------------------------------------------------------')
     print('\n')
-    print('---------------------------------------------------------------------------------------------------------')
     print('---------------------------------------------------------------------------------------------------------')
     print(' follow me for more such exciting bots! https://github.com/aadhi000')
     print('---------------------------------------------------------------------------------------------------------')
@@ -74,7 +92,7 @@ async def start_services():
     print('                        server ip =>> {}:{}'.format(bind_address, Var.PORT))
     print('                        Owner =>> {}'.format((Var.OWNER_USERNAME)))
     if Var.ON_HEROKU:
-        print('                        app runnng on =>> {}'.format(Var.FQDN))
+        print('                        app running on =>> {}'.format(Var.FQDN))
     print('---------------------------------------------------------------------------------------------------------')
     print('Give a star to my repo https://github.com/adarsh-goel/filestreambot-pro  also follow me for new bots')
     print('---------------------------------------------------------------------------------------------------------')
